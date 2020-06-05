@@ -1,0 +1,12 @@
+[package]
+name = "debugger"
+version = "0.1.0"
+authors = ["Ying <engyingxuan@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rustyline = "6.1.2"
+nix = "0.17.0"
+gimli = "0.21.0"
