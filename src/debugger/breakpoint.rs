@@ -1,5 +1,5 @@
 use super::Debugger;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use nix::sys::ptrace::AddressType;
 
 pub struct Breakpoint {
@@ -11,27 +11,32 @@ pub struct Breakpoint {
 impl Breakpoint {
     pub fn new(addr: u64, debugger: &mut Debugger) -> Result<Self> {
         let mut bp = Breakpoint {
-            addr: unsafe { addr as AddressType },
+            addr: addr as AddressType,
             enabled: false,
             instruct_byte: None,
         };
-        bp.set_breakpoint(debugger)?;
+        bp.enable_breakpoint(debugger)?;
         Ok(bp)
     }
 
-    pub fn set_breakpoint(&mut self, debugger: &mut Debugger) -> Result<()> {
-        let curr_inst = debugger.read_addr(self.addr)? as u64;
+    pub fn enable_breakpoint(&mut self, debugger: &mut Debugger) -> Result<()> {
+        let curr_inst = debugger
+            .read_addr(self.addr)
+            .with_context(|| format!("failed to enable breakpoint at {:X?}", self.addr))?
+            as u64;
         self.instruct_byte = Some(curr_inst);
         // 0xCC is INT3 instruction
-        debugger.write_addr(self.addr, curr_inst | 0xCC)?;
+        debugger.write_addr(self.addr, (curr_inst & 0xFF) | 0xCC)?;
+        self.enabled = true;
         Ok(())
     }
 
-    pub fn rem_breakpoint(&mut self, debugger: &mut Debugger) -> Result<()> {
+    pub fn disable_breakpoint(&mut self, debugger: &mut Debugger) -> Result<()> {
         let inst = self
             .instruct_byte
             .expect("instruction must be cached when breakpoint is set");
         debugger.write_addr(self.addr, inst)?;
+        self.enabled = false;
         Ok(())
     }
 }

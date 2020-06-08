@@ -29,8 +29,14 @@ impl Debugger {
                     let cleaned_cmd = cmd.trim();
                     match cleaned_cmd {
                         "continue" => return self.handle_continue(),
-                        _ => {
-                            println!("{}", "invalid command");
+                        c => {
+                            if c.starts_with("b set") {
+                                let args: Vec<_> = c.split(" ").collect();
+                                let addr = args[2].parse::<u64>()?;
+                                self.handle_add_bp(addr)?;
+                            } else {
+                                println!("{}", "invalid command");
+                            }
                         }
                     }
                 }
@@ -42,7 +48,7 @@ impl Debugger {
     }
 
     pub fn write_addr(&mut self, addr: AddressType, data: u64) -> Result<()> {
-        let casted_data = unsafe { data as *mut c_void };
+        let casted_data = data as *mut c_void;
         ptrace::write(self.pid, addr, casted_data)
             .with_context(|| format!("writing {:X?} to {:X?} failed", casted_data, addr))
     }
@@ -57,7 +63,8 @@ impl Debugger {
     }
 
     pub fn handle_add_bp(&mut self, addr: u64) -> Result<()> {
-        let bp = Breakpoint::new(addr, self)?;
+        let bp = Breakpoint::new(addr, self)
+            .with_context(|| format!("failed to add breakpoint for address {:X?}", addr))?;
         self.breakpoints.push(bp);
         Ok(())
     }
