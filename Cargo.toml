@@ -1,5 +1,5 @@
 [package]
-name = "debugger"
+name = "derustify"
 version = "0.1.0"
 authors = ["Ying <engyingxuan@gmail.com>"]
 edition = "2018"
@@ -10,3 +10,4 @@ edition = "2018"
 rustyline = "6.1.2"
 nix = "0.17.0"
 gimli = "0.21.0"
+anyhow = "1.0"
