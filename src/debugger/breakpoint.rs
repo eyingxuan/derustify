@@ -22,6 +22,7 @@ impl Breakpoint {
     pub fn set_breakpoint(&mut self, debugger: &mut Debugger) -> Result<()> {
         let curr_inst = debugger.read_addr(self.addr)? as u64;
         self.instruct_byte = Some(curr_inst);
+        // 0xCC is INT3 instruction
         debugger.write_addr(self.addr, curr_inst | 0xCC)?;
         Ok(())
     }
