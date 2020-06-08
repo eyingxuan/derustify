@@ -1,4 +1,5 @@
 use anyhow::{Error, Result};
+use anyhow::{Context, Result};
 use nix::{sys::ptrace, unistd::Pid};
 use rustyline::{error::ReadlineError, Editor};
 
@@ -21,7 +22,7 @@ impl Debugger {
                 Ok(cmd) => {
                     let cleaned_cmd = cmd.trim();
                     match cleaned_cmd {
-                        "continue" => return self.handle_continue().map_err(Error::new),
+                        "continue" => return self.handle_continue(),
                         _ => {
                             println!("{}", "invalid command");
                         }
@@ -29,13 +30,13 @@ impl Debugger {
                 }
                 Err(ReadlineError::Interrupted) => {}
                 Err(ReadlineError::Eof) => {}
-                Err(e) => return Err(Error::new(e)),
+                Err(e) => return Err(e).with_context(|| "could not read user input"),
             }
         }
     }
 
-    pub fn handle_continue(&mut self) -> Result<(), nix::Error> {
+    pub fn handle_continue(&mut self) -> Result<()> {
         println!("Continuing debugee execution");
-        ptrace::cont(self.child_pid, None)
+        ptrace::cont(self.pid, None).with_context(|| "could not continue tracing")
     }
 }
