@@ -1,8 +1,14 @@
-use nix::unistd::{execvp, fork, ForkResult};
-use std::{env::args, error::Error, ffi::CString};
+use anyhow::Result;
+use nix::{
+    sys::{ptrace, wait::waitpid},
+    unistd::{execvp, fork, ForkResult},
+};
+use std::{env::args, ffi::CString};
 
-// TODO: use failure crate?
-fn main() -> Result<(), Box<dyn Error>> {
+mod debugger;
+use debugger::Debugger;
+
+fn main() -> Result<()> {
     // TODO: use structops to cleanup
     let args: Vec<_> = args().collect();
     if args.len() < 2 {
@@ -11,12 +17,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     let prog = CString::new(args[1].clone())?;
 
-    match fork() {
-        Ok(ForkResult::Parent { child }) => {}
-        Ok(ForkResult::Child) => {
+    match fork()? {
+        ForkResult::Parent { child } => {
+            let mut debugger = Debugger::new(child);
+
+            let _wait_status = waitpid(child, None)?;
+            debugger.run()?;
+
+            // Wait for child to exit
+            let _wait_status = waitpid(child, None)?;
+        }
+        ForkResult::Child => {
+            // TODO: allow users to pass in arguments
+            ptrace::traceme()?;
             execvp(prog.as_c_str(), &[prog.as_c_str()])?;
         }
-        Err(_) => {}
     }
 
     Ok(())
