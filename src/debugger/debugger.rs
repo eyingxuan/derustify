@@ -1,16 +1,17 @@
 use anyhow::{Context, Result};
 use nix::{sys::ptrace, unistd::Pid};
-use ptrace::AddressType;
 use rustyline::{error::ReadlineError, Editor};
-use std::ffi::c_void;
 
-mod breakpoint;
-use breakpoint::Breakpoint;
+use crate::debugger::{Breakpoint, CommandHandler, PtraceSender};
+
+struct DebuggerState {
+    breakpoints: Vec<Breakpoint>,
+}
 
 pub struct Debugger {
     pid: Pid,
+    state: DebuggerState,
     editor: Editor<()>,
-    breakpoints: Vec<Breakpoint>,
 }
 
 impl Debugger {
@@ -18,7 +19,9 @@ impl Debugger {
         Debugger {
             pid,
             editor: Editor::<()>::new(),
-            breakpoints: Vec::new(),
+            state: DebuggerState {
+                breakpoints: Vec::new(),
+            },
         }
     }
 
@@ -47,25 +50,14 @@ impl Debugger {
         }
     }
 
-    pub fn write_addr(&mut self, addr: AddressType, data: u64) -> Result<()> {
-        let casted_data = data as *mut c_void;
-        ptrace::write(self.pid, addr, casted_data)
-            .with_context(|| format!("writing {:X?} to {:X?} failed", casted_data, addr))
-    }
-
-    pub fn read_addr(&self, addr: AddressType) -> Result<i64> {
-        ptrace::read(self.pid, addr).with_context(|| format!("reading from {:X?} failed", addr))
-    }
-
-    pub fn handle_continue(&mut self) -> Result<()> {
-        println!("Continuing debugee execution");
+    fn handle_continue(&mut self) -> Result<()> {
         ptrace::cont(self.pid, None).with_context(|| "could not continue tracing")
     }
 
-    pub fn handle_add_bp(&mut self, addr: u64) -> Result<()> {
-        let bp = Breakpoint::new(addr, self)
+    fn handle_add_bp(&mut self, addr: u64) -> Result<()> {
+        let bp = Breakpoint::new(addr, PtraceSender::new(self.pid))
             .with_context(|| format!("failed to add breakpoint for address {:X?}", addr))?;
-        self.breakpoints.push(bp);
+        self.state.breakpoints.push(bp);
         Ok(())
     }
 }
