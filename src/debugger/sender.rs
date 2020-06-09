@@ -1,5 +1,11 @@
 use anyhow::{Context, Result};
-use nix::{sys::ptrace, unistd::Pid};
+use nix::{
+    sys::{
+        ptrace,
+        wait::{waitpid, WaitStatus},
+    },
+    unistd::Pid,
+};
 use std::ffi::c_void;
 
 #[derive(Copy, Clone)]
@@ -24,5 +30,9 @@ impl PtraceSender {
 
     pub fn send_cont(&self) -> Result<()> {
         ptrace::cont(self.pid, None).with_context(|| "could not continue debugee")
+    }
+
+    pub fn wait(&self) -> Result<WaitStatus> {
+        waitpid(self.pid, None).with_context(|| "wait syscall failed")
     }
 }

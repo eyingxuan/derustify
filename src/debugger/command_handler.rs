@@ -24,7 +24,9 @@ impl CommandHandler {
     }
 
     fn handle_continue(&self) -> Result<()> {
-        self.sender.send_cont()
+        self.sender.send_cont()?;
+        self.sender.wait()?;
+        Ok(())
     }
 
     fn handle_break(&self, args: &[&str], state: &mut DebuggerState) -> Result<()> {
