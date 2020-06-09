@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use nix::{sys::ptrace, unistd::Pid};
 use std::ffi::c_void;
 
+#[derive(Copy, Clone)]
 pub struct PtraceSender {
     pid: Pid,
 }
@@ -19,5 +20,9 @@ impl PtraceSender {
 
     pub fn read_addr(&self, addr: ptrace::AddressType) -> Result<i64> {
         ptrace::read(self.pid, addr).with_context(|| format!("reading from {:X?} failed", addr))
+    }
+
+    pub fn send_cont(&self) -> Result<()> {
+        ptrace::cont(self.pid, None).with_context(|| "could not continue debugee")
     }
 }

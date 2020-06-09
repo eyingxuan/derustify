@@ -1,17 +1,20 @@
+use super::{breakpoint::Breakpoint, command_handler::CommandHandler, sender::PtraceSender};
 use anyhow::{Context, Result};
-use nix::{sys::ptrace, unistd::Pid};
+use nix::{
+    sys::wait::{waitpid, WaitStatus},
+    unistd::Pid,
+};
 use rustyline::{error::ReadlineError, Editor};
 
-use crate::debugger::{Breakpoint, CommandHandler, PtraceSender};
-
-struct DebuggerState {
-    breakpoints: Vec<Breakpoint>,
+pub struct DebuggerState {
+    pub breakpoints: Vec<Breakpoint>,
 }
 
 pub struct Debugger {
     pid: Pid,
     state: DebuggerState,
     editor: Editor<()>,
+    cmdhandler: CommandHandler,
 }
 
 impl Debugger {
@@ -22,42 +25,29 @@ impl Debugger {
             state: DebuggerState {
                 breakpoints: Vec::new(),
             },
+            cmdhandler: CommandHandler::new(PtraceSender::new(pid)),
         }
     }
 
     pub fn run(&mut self) -> Result<()> {
         loop {
             match self.editor.readline("derustify> ") {
-                Ok(cmd) => {
-                    let cleaned_cmd = cmd.trim();
-                    match cleaned_cmd {
-                        "continue" => return self.handle_continue(),
-                        c => {
-                            if c.starts_with("b set") {
-                                let args: Vec<_> = c.split(" ").collect();
-                                let addr = args[2].parse::<u64>()?;
-                                self.handle_add_bp(addr)?;
-                            } else {
-                                println!("{}", "invalid command");
-                            }
-                        }
-                    }
-                }
-                Err(ReadlineError::Interrupted) => {}
-                Err(ReadlineError::Eof) => {}
+                Ok(cmd) => self.cmdhandler.run_command(cmd, &mut self.state)?,
+                Err(ReadlineError::Interrupted) => break,
+                Err(ReadlineError::Eof) => break,
                 Err(e) => return Err(e).with_context(|| "could not read user input"),
+            };
+            match waitpid(self.pid, None)? {
+                WaitStatus::Exited(_, exit_code) => {
+                    println! {"child exited with exit code {}", exit_code};
+                    break;
+                }
+                _ => {
+                    continue;
+                }
             }
         }
-    }
 
-    fn handle_continue(&mut self) -> Result<()> {
-        ptrace::cont(self.pid, None).with_context(|| "could not continue tracing")
-    }
-
-    fn handle_add_bp(&mut self, addr: u64) -> Result<()> {
-        let bp = Breakpoint::new(addr, PtraceSender::new(self.pid))
-            .with_context(|| format!("failed to add breakpoint for address {:X?}", addr))?;
-        self.state.breakpoints.push(bp);
         Ok(())
     }
 }

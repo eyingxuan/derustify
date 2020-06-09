@@ -1,4 +1,4 @@
-use super::PtraceSender;
+use super::sender::PtraceSender;
 use anyhow::{Context, Result};
 use nix::sys::ptrace::AddressType;
 

@@ -20,12 +20,8 @@ fn main() -> Result<()> {
     match fork()? {
         ForkResult::Parent { child } => {
             let mut debugger = Debugger::new(child);
-
-            let _wait_status = waitpid(child, None)?;
+            waitpid(child, None)?;
             debugger.run()?;
-
-            // Wait for child to exit
-            let _wait_status = waitpid(child, None)?;
         }
         ForkResult::Child => {
             // TODO: allow users to pass in arguments
